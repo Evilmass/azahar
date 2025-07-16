@@ -139,8 +139,8 @@ void ThreadManager::SwitchContext(Thread* new_thread) {
 
     // Save context for previous thread
     if (previous_thread) {
-        previous_process = previous_thread->owner_process.lock();
-        previous_thread->last_running_ticks = cpu->GetTimer().GetTicks();
+        previous_process = previous_thread->owner_process;
+        previous_thread->last_running_ticks = timing.GetGlobalTicks();
         cpu->SaveContext(previous_thread->context);
 
         if (previous_thread->status == ThreadStatus::Running) {
@@ -385,7 +385,7 @@ ResultVal<std::shared_ptr<Thread>> KernelSystem::CreateThread(
     thread->entry_point = entry_point;
     thread->stack_top = stack_top;
     thread->nominal_priority = thread->current_priority = priority;
-    thread->last_running_ticks = timing.GetTimer(processor_id)->GetTicks();
+    thread->last_running_ticks = timing.GetGlobalTicks();
     thread->processor_id = processor_id;
     thread->wait_objects.clear();
     thread->wait_address = 0;
