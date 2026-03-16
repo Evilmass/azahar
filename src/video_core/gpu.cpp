@@ -42,7 +42,9 @@ GPU::GPU(Core::System& system, Frontend::EmuWindow& emu_window,
     impl->pica.BindRasterizer(impl->rasterizer);
 }
 
-GPU::~GPU() = default;
+GPU::~GPU() {
+    SyncGpu();
+}
 
 PAddr GPU::VirtualToPhysicalAddress(VAddr addr) {
     if (addr == 0) {
@@ -431,7 +433,7 @@ void GPU::VBlankCallback(std::uintptr_t user_data, s64 cycles_late) {
     // Ensure all async GPU work is done before presenting.
     SyncGpu();
 
-    // Present renderered frame.
+    // Present rendered frame.
     impl->renderer->SwapBuffers();
 
     // Signal to GSP that GPU interrupt has occurred

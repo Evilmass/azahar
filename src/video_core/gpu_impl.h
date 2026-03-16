@@ -49,7 +49,7 @@ struct GPU::Impl {
           sw_blitter{std::make_unique<SwRenderer::SwBlitter>(memory, rasterizer)},
           is_async{Settings::values.async_gpu_emulation.GetValue()} {
         if (is_async) {
-            gpu_worker = std::make_unique<Common::ThreadWorker>(1, "GPU");
+            gpu_worker = std::make_unique<Common::ThreadWorker>(1, "GPUWorker");
         }
     }
     ~Impl() = default;
