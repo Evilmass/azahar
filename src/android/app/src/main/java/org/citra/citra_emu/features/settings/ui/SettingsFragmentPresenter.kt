@@ -902,6 +902,15 @@ class SettingsFragmentPresenter(private val fragmentView: SettingsFragmentView) 
                 )
             )
             add(
+                SwitchSetting(
+                    BooleanSetting.ASYNC_GPU_EMULATION,
+                    R.string.async_gpu_emulation,
+                    R.string.async_gpu_emulation_description,
+                    BooleanSetting.ASYNC_GPU_EMULATION.key,
+                    BooleanSetting.ASYNC_GPU_EMULATION.defaultValue
+                )
+            )
+            add(
                 SingleChoiceSetting(
                     IntSetting.RESOLUTION_FACTOR,
                     R.string.internal_resolution,

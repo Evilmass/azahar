@@ -24,6 +24,7 @@ ConfigureGraphics::ConfigureGraphics(QString gl_renderer, std::span<const QStrin
     ui->toggle_accurate_mul->setEnabled(!is_powered_on);
     ui->toggle_async_shaders->setEnabled(!is_powered_on);
     ui->toggle_async_present->setEnabled(!is_powered_on);
+    ui->toggle_async_gpu->setEnabled(!is_powered_on);
     ui->toggle_display_refresh_rate_detection->setEnabled(!is_powered_on);
     // Set the index to -1 to ensure the below lambda is called with setCurrentIndex
     ui->graphics_api_combo->setCurrentIndex(-1);
@@ -148,6 +149,7 @@ void ConfigureGraphics::SetConfiguration() {
     ui->disable_spirv_optimizer->setChecked(Settings::values.disable_spirv_optimizer.GetValue());
     ui->toggle_async_shaders->setChecked(Settings::values.async_shader_compilation.GetValue());
     ui->toggle_async_present->setChecked(Settings::values.async_presentation.GetValue());
+    ui->toggle_async_gpu->setChecked(Settings::values.async_gpu_emulation.GetValue());
 
     if (Settings::IsConfiguringGlobal()) {
         ui->toggle_shader_jit->setChecked(Settings::values.use_shader_jit.GetValue());
@@ -165,6 +167,8 @@ void ConfigureGraphics::ApplyConfiguration() {
                                              ui->toggle_async_shaders, async_shader_compilation);
     ConfigurationShared::ApplyPerGameSetting(&Settings::values.async_presentation,
                                              ui->toggle_async_present, async_presentation);
+    ConfigurationShared::ApplyPerGameSetting(&Settings::values.async_gpu_emulation,
+                                             ui->toggle_async_gpu, async_gpu_emulation);
     ConfigurationShared::ApplyPerGameSetting(&Settings::values.spirv_shader_gen,
                                              ui->spirv_shader_gen, spirv_shader_gen);
     ConfigurationShared::ApplyPerGameSetting(&Settings::values.disable_spirv_optimizer,
@@ -208,6 +212,7 @@ void ConfigureGraphics::SetupPerGameUI() {
             Settings::values.async_shader_compilation.UsingGlobal());
         ui->widget_texture_sampling->setEnabled(Settings::values.texture_sampling.UsingGlobal());
         ui->toggle_async_present->setEnabled(Settings::values.async_presentation.UsingGlobal());
+        ui->toggle_async_gpu->setEnabled(Settings::values.async_gpu_emulation.UsingGlobal());
         ui->graphics_api_combo->setEnabled(Settings::values.graphics_api.UsingGlobal());
         ui->physical_device_combo->setEnabled(Settings::values.physical_device.UsingGlobal());
         ui->delay_render_combo->setEnabled(
@@ -249,6 +254,9 @@ void ConfigureGraphics::SetupPerGameUI() {
                                             async_shader_compilation);
     ConfigurationShared::SetColoredTristate(
         ui->toggle_async_present, Settings::values.async_presentation, async_presentation);
+    ConfigurationShared::SetColoredTristate(ui->toggle_async_gpu,
+                                            Settings::values.async_gpu_emulation,
+                                            async_gpu_emulation);
     ConfigurationShared::SetColoredTristate(ui->spirv_shader_gen, Settings::values.spirv_shader_gen,
                                             spirv_shader_gen);
     ConfigurationShared::SetColoredTristate(ui->disable_spirv_optimizer,

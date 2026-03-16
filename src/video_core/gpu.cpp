@@ -74,18 +74,35 @@ void GPU::SetInterruptHandler(Service::GSP::InterruptHandler handler) {
 }
 
 void GPU::FlushRegion(PAddr addr, u32 size) {
+    SyncGpu();
     impl->rasterizer->FlushRegion(addr, size);
 }
 
 void GPU::InvalidateRegion(PAddr addr, u32 size) {
+    SyncGpu();
     impl->rasterizer->InvalidateRegion(addr, size);
 }
 
 void GPU::ClearAll(bool flush) {
+    SyncGpu();
     impl->rasterizer->ClearAll(flush);
 }
 
+void GPU::SyncGpu() {
+    if (impl->gpu_worker) {
+        impl->gpu_worker->WaitForRequests();
+    }
+}
+
 void GPU::Execute(const Service::GSP::Command& command) {
+    if (impl->is_async) {
+        impl->gpu_worker->QueueWork([this, command] { ExecuteInternal(command); });
+        return;
+    }
+    ExecuteInternal(command);
+}
+
+void GPU::ExecuteInternal(const Service::GSP::Command& command) {
     using Service::GSP::CommandId;
     auto& regs = impl->pica.regs;
 
@@ -411,6 +428,9 @@ void GPU::MemoryTransfer() {
 }
 
 void GPU::VBlankCallback(std::uintptr_t user_data, s64 cycles_late) {
+    // Ensure all async GPU work is done before presenting.
+    SyncGpu();
+
     // Present renderered frame.
     impl->renderer->SwapBuffers();
 
@@ -423,6 +443,9 @@ void GPU::VBlankCallback(std::uintptr_t user_data, s64 cycles_late) {
 }
 
 void GPU::RecreateRenderer(Frontend::EmuWindow& emu_window, Frontend::EmuWindow* secondary_window) {
+    // Ensure all async GPU work is done before recreating.
+    SyncGpu();
+
     // Reset the renderer (this will destroy OpenGL resources)
     impl->renderer.reset();
 
@@ -462,6 +485,9 @@ void GPU::RecreateRenderer(Frontend::EmuWindow& emu_window, Frontend::EmuWindow*
 }
 
 void GPU::ReleaseRenderer() {
+    // Ensure all async GPU work is done before releasing.
+    SyncGpu();
+
     // Just reset the renderer to release OpenGL resources
     // Don't null out rasterizer pointer as it will become dangling
     impl->renderer.reset();

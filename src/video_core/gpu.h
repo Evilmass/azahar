@@ -63,6 +63,9 @@ public:
     /// Executes the provided GSP command.
     void Execute(const Service::GSP::Command& command);
 
+    /// Waits for all pending async GPU work to complete.
+    void SyncGpu();
+
     /// Updates GPU display framebuffer configuration using the specified parameters.
     void SetBufferSwap(u32 screen_id, const Service::GSP::FrameBufferInfo& info);
 
@@ -103,6 +106,8 @@ public:
     void ReleaseRenderer();
 
 private:
+    void ExecuteInternal(const Service::GSP::Command& command);
+
     void SubmitCmdList(u32 index);
 
     // Interrupt index must be 0 or 1 to signal the relative PSC interrupt.

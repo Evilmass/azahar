@@ -241,6 +241,16 @@
         </property>
        </widget>
       </item>
+      <item>
+       <widget class="QCheckBox" name="toggle_async_gpu">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Execute GPU commands on a dedicated worker thread, allowing the CPU to continue processing while the GPU handles rendering. May improve performance but can introduce minor graphical glitches.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="text">
+         <string>Enable async GPU emulation</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>

@@ -34,6 +34,7 @@ object SettingKeys {
     external fun disable_spirv_optimizer(): String
     external fun async_shader_compilation(): String
     external fun async_presentation(): String
+    external fun async_gpu_emulation(): String
     external fun use_hw_shader(): String
     external fun use_disk_shader_cache(): String
     external fun shaders_accurate_mul(): String
