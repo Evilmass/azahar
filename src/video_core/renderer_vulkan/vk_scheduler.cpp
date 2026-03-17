@@ -5,6 +5,7 @@
 #include <mutex>
 #include <utility>
 #include "common/microprofile.h"
+#include "common/settings.h"
 #include "common/thread.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
@@ -49,10 +50,11 @@ void Scheduler::CommandChunk::ExecuteAll(vk::CommandBuffer cmdbuf) {
 
 Scheduler::Scheduler(const Instance& instance)
     : master_semaphore{MakeMasterSemaphore(instance)},
-      command_pool{instance, master_semaphore.get()}, use_worker_thread{true} {
+      command_pool{instance, master_semaphore.get()},
+      use_worker_thread{Settings::values.async_gpu.GetValue()} {
     AllocateWorkerCommandBuffers();
+    AcquireNewChunk();
     if (use_worker_thread) {
-        AcquireNewChunk();
         worker_thread = std::jthread([this](std::stop_token token) { WorkerThread(token); });
     }
 }
@@ -99,11 +101,20 @@ void Scheduler::Wait(u64 tick) {
 }
 
 void Scheduler::DispatchWork() {
-    if (!use_worker_thread || chunk->Empty()) {
+    if (chunk->Empty()) {
         return;
     }
 
     on_dispatch();
+
+    if (!use_worker_thread) {
+        const bool has_submit = chunk->HasSubmit();
+        chunk->ExecuteAll(current_cmdbuf);
+        if (has_submit) {
+            AllocateWorkerCommandBuffers();
+        }
+        return;
+    }
 
     {
         std::scoped_lock ql{queue_mutex};
@@ -190,12 +201,8 @@ void Scheduler::SubmitExecution(vk::Semaphore signal_semaphore, vk::Semaphore wa
 
     master_semaphore->Refresh();
 
-    if (!use_worker_thread) {
-        AllocateWorkerCommandBuffers();
-    } else {
-        chunk->MarkSubmit();
-        DispatchWork();
-    }
+    chunk->MarkSubmit();
+    DispatchWork();
 }
 
 void Scheduler::AcquireNewChunk() {

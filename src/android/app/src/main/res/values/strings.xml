@@ -256,6 +256,8 @@
     <string name="disable_spirv_optimizer_description">Disables the SPIR-V optimization pass, reducing stuttering considerably while barely affecting performance.</string>
     <string name="async_shaders">Enable Asynchronous Shader Compilation</string>
     <string name="async_shaders_description">Compiles shaders in the background to reduce stuttering during gameplay. When enabled expect temporary graphical glitches</string>
+    <string name="async_gpu">Enable Asynchronous GPU</string>
+    <string name="async_gpu_description">Executes Vulkan GPU work on a dedicated worker thread. This improves performance in many games, but may increase latency or expose timing-sensitive issues.</string>
     <string name="linear_filtering">Linear Filtering</string>
     <string name="linear_filtering_description">Enables linear filtering, which causes game visuals to appear smoother.</string>
     <string name="use_integer_scaling">Integer Scaling</string>

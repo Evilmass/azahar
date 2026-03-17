@@ -231,16 +231,26 @@
         </property>
        </widget>
       </item>
-      <item>
-       <widget class="QCheckBox" name="toggle_async_present">
-        <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Perform presentation on separate threads. Improves performance when using Vulkan in most applications. Adds ~1 frame of input lag.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="text">
-         <string>Enable async presentation</string>
-        </property>
-       </widget>
-      </item>
+       <item>
+        <widget class="QCheckBox" name="toggle_async_present">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Perform presentation on separate threads. Improves performance when using Vulkan in most applications. Adds ~1 frame of input lag.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string>Enable async presentation</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="toggle_async_gpu">
+         <property name="toolTip">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Execute Vulkan GPU work on a dedicated worker thread. Improves performance in many games, but may increase latency or expose timing-sensitive issues.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="text">
+          <string>Enable async GPU</string>
+         </property>
+        </widget>
+       </item>
      </layout>
     </widget>
    </item>
