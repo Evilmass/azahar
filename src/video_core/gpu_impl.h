@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <mutex>
+
 #include "common/archives.h"
 #include "common/microprofile.h"
 #include "core/core.h"
@@ -13,6 +15,7 @@
 #include "core/hle/service/plgldr/plgldr.h"
 #include "video_core/debug_utils/debug_utils.h"
 #include "video_core/gpu.h"
+#include "video_core/gpu_command_queue.h"
 #include "video_core/gpu_debugger.h"
 #include "video_core/gpu_impl.h"
 #include "video_core/pica/pica_core.h"
@@ -33,6 +36,8 @@ struct GPU::Impl {
     std::unique_ptr<RendererBase> renderer;
     RasterizerInterface* rasterizer;
     std::unique_ptr<SwRenderer::SwBlitter> sw_blitter;
+    mutable std::recursive_mutex rasterizer_mutex;
+    std::unique_ptr<GPUCommandQueue> command_queue;
     Core::TimingEventType* vblank_event;
     Service::GSP::InterruptHandler signal_interrupt;
 

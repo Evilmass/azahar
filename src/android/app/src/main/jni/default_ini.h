@@ -97,6 +97,10 @@ static const char* android_config_default_file_content = (BOOST_HANA_STRING(R"(
 # 0: Off, 1: On (default)
 )") DECLARE_KEY(async_shader_compilation) BOOST_HANA_STRING(R"(
 
+# Whether to process GPU commands on a worker thread
+# 0: Off, 1: On (default)
+)") DECLARE_KEY(async_gpu) BOOST_HANA_STRING(R"(
+
 # Whether to emit PICA fragment shader using SPIRV or GLSL (Vulkan only)
 # 0: GLSL, 1: SPIR-V (default)
 )") DECLARE_KEY(spirv_shader_gen) BOOST_HANA_STRING(R"(

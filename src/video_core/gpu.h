@@ -36,6 +36,7 @@ namespace VideoCore {
 constexpr u64 FRAME_TICKS = 4481136ull;
 
 class GraphicsDebugger;
+class GPUCommandQueue;
 class RendererBase;
 class RightEyeDisabler;
 
@@ -56,6 +57,9 @@ public:
 
     /// Notify rasterizer that any caches of the specified region should be invalidated
     void InvalidateRegion(PAddr addr, u32 size);
+
+    /// Notify rasterizer that any caches of the specified region should be flushed and invalidated
+    void FlushAndInvalidateRegion(PAddr addr, u32 size);
 
     /// Flushes and invalidates all memory in the rasterizer cache and removes any leftover state.
     void ClearAll(bool flush);
@@ -103,6 +107,11 @@ public:
     void ReleaseRenderer();
 
 private:
+    void ExecuteCommand(const Service::GSP::Command& command);
+
+    void InitializeCommandQueue(Frontend::EmuWindow& emu_window);
+    void ShutdownCommandQueue();
+
     void SubmitCmdList(u32 index);
 
     // Interrupt index must be 0 or 1 to signal the relative PSC interrupt.
@@ -116,6 +125,7 @@ private:
     template <class Archive>
     void serialize(Archive& ar, const u32 file_version);
 
+    friend class GPUCommandQueue;
     std::unique_ptr<RightEyeDisabler> right_eye_disabler;
 
 private:

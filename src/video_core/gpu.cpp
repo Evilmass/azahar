@@ -4,14 +4,18 @@
 
 #include "common/archives.h"
 #include "common/hacks/hack_manager.h"
+#include "common/logging/log.h"
 #include "common/microprofile.h"
+#include "common/settings.h"
 #include "core/core.h"
 #include "core/core_timing.h"
+#include "core/frontend/emu_window.h"
 #include "core/hle/service/gsp/gsp_gpu.h"
 #include "core/hle/service/plgldr/plgldr.h"
 #include "core/loader/loader.h"
 #include "video_core/debug_utils/debug_utils.h"
 #include "video_core/gpu.h"
+#include "video_core/gpu_command_queue.h"
 #include "video_core/gpu_debugger.h"
 #include "video_core/gpu_impl.h"
 #include "video_core/pica/pica_core.h"
@@ -40,6 +44,8 @@ GPU::GPU(Core::System& system, Frontend::EmuWindow& emu_window,
 
     // Bind the rasterizer to the PICA GPU
     impl->pica.BindRasterizer(impl->rasterizer);
+
+    InitializeCommandQueue(emu_window);
 }
 
 GPU::~GPU() = default;
@@ -74,18 +80,50 @@ void GPU::SetInterruptHandler(Service::GSP::InterruptHandler handler) {
 }
 
 void GPU::FlushRegion(PAddr addr, u32 size) {
+    if (impl->command_queue) {
+        const std::lock_guard lock(impl->rasterizer_mutex);
+        impl->rasterizer->FlushRegion(addr, size);
+        return;
+    }
     impl->rasterizer->FlushRegion(addr, size);
 }
 
 void GPU::InvalidateRegion(PAddr addr, u32 size) {
+    if (impl->command_queue) {
+        const std::lock_guard lock(impl->rasterizer_mutex);
+        impl->rasterizer->InvalidateRegion(addr, size);
+        return;
+    }
     impl->rasterizer->InvalidateRegion(addr, size);
 }
 
+void GPU::FlushAndInvalidateRegion(PAddr addr, u32 size) {
+    if (impl->command_queue) {
+        const std::lock_guard lock(impl->rasterizer_mutex);
+        impl->rasterizer->FlushAndInvalidateRegion(addr, size);
+        return;
+    }
+    impl->rasterizer->FlushAndInvalidateRegion(addr, size);
+}
+
 void GPU::ClearAll(bool flush) {
+    if (impl->command_queue) {
+        const std::lock_guard lock(impl->rasterizer_mutex);
+        impl->rasterizer->ClearAll(flush);
+        return;
+    }
     impl->rasterizer->ClearAll(flush);
 }
 
 void GPU::Execute(const Service::GSP::Command& command) {
+    if (impl->command_queue) {
+        impl->command_queue->QueueCommand(command);
+        return;
+    }
+    ExecuteCommand(command);
+}
+
+void GPU::ExecuteCommand(const Service::GSP::Command& command) {
     using Service::GSP::CommandId;
     auto& regs = impl->pica.regs;
 
@@ -190,6 +228,14 @@ void GPU::Execute(const Service::GSP::Command& command) {
 }
 
 void GPU::SetBufferSwap(u32 screen_id, const Service::GSP::FrameBufferInfo& info) {
+    const auto maybe_lock = [this]() -> std::unique_lock<std::recursive_mutex> {
+        if (impl->command_queue) {
+            return std::unique_lock<std::recursive_mutex>(impl->rasterizer_mutex);
+        }
+        return std::unique_lock<std::recursive_mutex>{};
+    };
+
+    auto lock = maybe_lock();
     const PAddr phys_address_left = VirtualToPhysicalAddress(info.address_left);
     const PAddr phys_address_right = VirtualToPhysicalAddress(info.address_right);
 
@@ -225,6 +271,14 @@ void GPU::SetColorFill(const Pica::ColorFill& fill) {
 }
 
 u32 GPU::ReadReg(VAddr addr) {
+    const auto maybe_lock = [this]() -> std::unique_lock<std::recursive_mutex> {
+        if (impl->command_queue) {
+            return std::unique_lock<std::recursive_mutex>(impl->rasterizer_mutex);
+        }
+        return std::unique_lock<std::recursive_mutex>{};
+    };
+
+    auto lock = maybe_lock();
     switch (addr & 0xFFFFF000) {
     case VADDR_LCD: {
         const u32 offset = addr - VADDR_LCD;
@@ -247,6 +301,14 @@ u32 GPU::ReadReg(VAddr addr) {
 }
 
 void GPU::WriteReg(VAddr addr, u32 data) {
+    const auto maybe_lock = [this]() -> std::unique_lock<std::recursive_mutex> {
+        if (impl->command_queue) {
+            return std::unique_lock<std::recursive_mutex>(impl->rasterizer_mutex);
+        }
+        return std::unique_lock<std::recursive_mutex>{};
+    };
+
+    auto lock = maybe_lock();
     switch (addr & 0xFFFFF000) {
     case VADDR_LCD: {
         const u32 offset = addr - VADDR_LCD;
@@ -328,6 +390,11 @@ void GPU::ApplyPerProgramSettings(u64 program_ID) {
         default:
             break;
         }
+    }
+    if (impl->command_queue) {
+        const std::lock_guard lock(impl->rasterizer_mutex);
+        impl->rasterizer->SetAccurateMul(use_accurate_mul);
+        return;
     }
     impl->rasterizer->SetAccurateMul(use_accurate_mul);
 }
@@ -411,8 +478,13 @@ void GPU::MemoryTransfer() {
 }
 
 void GPU::VBlankCallback(std::uintptr_t user_data, s64 cycles_late) {
-    // Present renderered frame.
-    impl->renderer->SwapBuffers();
+    if (impl->command_queue) {
+        const std::lock_guard lock(impl->rasterizer_mutex);
+        impl->renderer->SwapBuffers();
+    } else {
+        // Present renderered frame.
+        impl->renderer->SwapBuffers();
+    }
 
     // Signal to GSP that GPU interrupt has occurred
     impl->signal_interrupt(Service::GSP::InterruptId::PDC0);
@@ -423,6 +495,8 @@ void GPU::VBlankCallback(std::uintptr_t user_data, s64 cycles_late) {
 }
 
 void GPU::RecreateRenderer(Frontend::EmuWindow& emu_window, Frontend::EmuWindow* secondary_window) {
+    ShutdownCommandQueue();
+
     // Reset the renderer (this will destroy OpenGL resources)
     impl->renderer.reset();
 
@@ -436,6 +510,8 @@ void GPU::RecreateRenderer(Frontend::EmuWindow& emu_window, Frontend::EmuWindow*
 
     // Update the sw_blitter with the new rasterizer
     impl->sw_blitter = std::make_unique<SwRenderer::SwBlitter>(impl->memory, impl->rasterizer);
+
+    InitializeCommandQueue(emu_window);
 
     // Re-apply per-game configuration and reload disk shader cache
     u64 program_id{};
@@ -462,6 +538,8 @@ void GPU::RecreateRenderer(Frontend::EmuWindow& emu_window, Frontend::EmuWindow*
 }
 
 void GPU::ReleaseRenderer() {
+    ShutdownCommandQueue();
+
     // Just reset the renderer to release OpenGL resources
     // Don't null out rasterizer pointer as it will become dangling
     impl->renderer.reset();
@@ -472,6 +550,46 @@ void GPU::ReleaseRenderer() {
 template <class Archive>
 void GPU::serialize(Archive& ar, const u32 file_version) {
     ar & impl->pica;
+}
+
+void GPU::InitializeCommandQueue(Frontend::EmuWindow& emu_window) {
+    impl->command_queue.reset();
+
+    if (!Settings::values.async_gpu.GetValue()) {
+        return;
+    }
+
+    const auto graphics_api = Settings::values.graphics_api.GetValue();
+    if (graphics_api == Settings::GraphicsAPI::Vulkan) {
+        return;
+    }
+
+    std::unique_ptr<Frontend::GraphicsContext> shared_context;
+    if (graphics_api == Settings::GraphicsAPI::OpenGL) {
+        emu_window.SaveContext();
+        shared_context = emu_window.CreateSharedContext();
+        if (shared_context) {
+            shared_context->DoneCurrent();
+        }
+        emu_window.RestoreContext();
+        if (!shared_context) {
+            LOG_WARNING(HW_GPU, "Async GPU requested but no shared graphics context is available");
+            return;
+        }
+    } else {
+        shared_context = std::make_unique<Frontend::GraphicsContext>();
+    }
+
+    impl->command_queue = std::make_unique<GPUCommandQueue>(*this, std::move(shared_context));
+}
+
+void GPU::ShutdownCommandQueue() {
+    if (!impl->command_queue) {
+        return;
+    }
+
+    impl->command_queue->WaitForIdle();
+    impl->command_queue.reset();
 }
 
 SERIALIZE_IMPL(GPU)
