@@ -123,6 +123,13 @@ void GPU::Execute(const Service::GSP::Command& command) {
     ExecuteCommand(command);
 }
 
+std::unique_lock<std::recursive_mutex> GPU::AcquireRasterizerLock() {
+    if (impl->command_queue) {
+        return std::unique_lock<std::recursive_mutex>(impl->rasterizer_mutex);
+    }
+    return std::unique_lock<std::recursive_mutex>{};
+}
+
 void GPU::ExecuteCommand(const Service::GSP::Command& command) {
     using Service::GSP::CommandId;
     auto& regs = impl->pica.regs;
@@ -228,14 +235,7 @@ void GPU::ExecuteCommand(const Service::GSP::Command& command) {
 }
 
 void GPU::SetBufferSwap(u32 screen_id, const Service::GSP::FrameBufferInfo& info) {
-    const auto maybe_lock = [this]() -> std::unique_lock<std::recursive_mutex> {
-        if (impl->command_queue) {
-            return std::unique_lock<std::recursive_mutex>(impl->rasterizer_mutex);
-        }
-        return std::unique_lock<std::recursive_mutex>{};
-    };
-
-    auto lock = maybe_lock();
+    auto lock = AcquireRasterizerLock();
     const PAddr phys_address_left = VirtualToPhysicalAddress(info.address_left);
     const PAddr phys_address_right = VirtualToPhysicalAddress(info.address_right);
 
@@ -271,14 +271,7 @@ void GPU::SetColorFill(const Pica::ColorFill& fill) {
 }
 
 u32 GPU::ReadReg(VAddr addr) {
-    const auto maybe_lock = [this]() -> std::unique_lock<std::recursive_mutex> {
-        if (impl->command_queue) {
-            return std::unique_lock<std::recursive_mutex>(impl->rasterizer_mutex);
-        }
-        return std::unique_lock<std::recursive_mutex>{};
-    };
-
-    auto lock = maybe_lock();
+    auto lock = AcquireRasterizerLock();
     switch (addr & 0xFFFFF000) {
     case VADDR_LCD: {
         const u32 offset = addr - VADDR_LCD;
@@ -301,14 +294,7 @@ u32 GPU::ReadReg(VAddr addr) {
 }
 
 void GPU::WriteReg(VAddr addr, u32 data) {
-    const auto maybe_lock = [this]() -> std::unique_lock<std::recursive_mutex> {
-        if (impl->command_queue) {
-            return std::unique_lock<std::recursive_mutex>(impl->rasterizer_mutex);
-        }
-        return std::unique_lock<std::recursive_mutex>{};
-    };
-
-    auto lock = maybe_lock();
+    auto lock = AcquireRasterizerLock();
     switch (addr & 0xFFFFF000) {
     case VADDR_LCD: {
         const u32 offset = addr - VADDR_LCD;
@@ -482,7 +468,7 @@ void GPU::VBlankCallback(std::uintptr_t user_data, s64 cycles_late) {
         const std::lock_guard lock(impl->rasterizer_mutex);
         impl->renderer->SwapBuffers();
     } else {
-        // Present renderered frame.
+        // Present rendered frame.
         impl->renderer->SwapBuffers();
     }
 

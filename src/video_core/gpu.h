@@ -6,6 +6,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <boost/serialization/access.hpp>
 
 #include "core/hle/service/gsp/gsp_interrupt.h"
@@ -111,6 +112,7 @@ private:
 
     void InitializeCommandQueue(Frontend::EmuWindow& emu_window);
     void ShutdownCommandQueue();
+    [[nodiscard]] std::unique_lock<std::recursive_mutex> AcquireRasterizerLock();
 
     void SubmitCmdList(u32 index);
 
