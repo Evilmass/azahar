@@ -300,7 +300,7 @@ void GSP_GPU::SetPerfLogMode(Kernel::HLERequestContext& ctx) {
     IPC::RequestParser rp(ctx);
     bool enabled = rp.Pop<u32>() != 0;
 
-    perf_recorder.SetEnabled(enabled);
+    perf_recorder.SetEnabled(false);
 
     IPC::RequestBuilder rb = rp.MakeBuilder(1, 0);
     rb.Push(ResultSuccess);
